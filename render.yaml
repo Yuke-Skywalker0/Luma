@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: luma-music
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 24.21.0
+      - key: NODE_ENV
+        value: production
+      - key: APP_VERSION
+        value: 6.9.0
+      - key: FRONTEND_ORIGIN
+        value: ""
+      - key: SPOTIFY_CLIENT_ID
+        sync: false
+      - key: SPOTIFY_CLIENT_SECRET
+        sync: false
+      - key: AUDIUS_API_KEY
+        sync: false
+      - key: AUDIUS_API_BASE
+        value: https://discoveryprovider.audius.co/v1
+      - key: JAMENDO_CLIENT_ID
+        sync: false
+      - key: JAMENDO_API_BASE
+        value: https://api.jamendo.com/v3.0
+      - key: SOUNDCLOUD_CLIENT_ID
+        sync: false
+      - key: MUSICBRAINZ_USER_AGENT
+        sync: false
