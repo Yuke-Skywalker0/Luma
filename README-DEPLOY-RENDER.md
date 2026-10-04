@@ -1,4 +1,4 @@
-# Luma Music 6.9.0 — Private GitHub + Render
+# Luma Music 7.4.0 — Private GitHub + Render
 
 ## Architecture
 One private GitHub repository -> one Render Web Service -> one public onrender.com URL.
@@ -16,7 +16,7 @@ Render serves both the React frontend and the Express API. GitHub remains privat
 git init
 git branch -M main
 git add .
-git commit -m "Luma Music 6.9.0"
+git commit -m "Luma Music 7.4.0"
 git remote add origin https://github.com/YOUR_USER/luma-music.git
 git push -u origin main
 ```

@@ -13,7 +13,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: APP_VERSION
-        value: 7.2.0
+        value: 7.4.0
       - key: FRONTEND_ORIGIN
         value: ""
       - key: SPOTIFY_CLIENT_ID
