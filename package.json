@@ -6,7 +6,22 @@
     "build:frontend": "npm run build --prefix frontend",
     "build:backend": "npm run build --prefix backend",
     "build": "npm run install:all && npm run build:frontend && npm run build:backend",
-    "start": "npm start --prefix backend"
+    "start": "npm start --prefix backend",
+    "native:build": "npm run build:frontend && npx cap sync",
+    "native:add:android": "npx cap add android",
+    "native:add:ios": "npx cap add ios",
+    "native:sync": "npx cap sync",
+    "native:open:android": "npx cap open android",
+    "native:open:ios": "npx cap open ios",
+    "native:doctor": "npx cap doctor",
+    "native:run:android": "npx cap run android",
+    "native:run:ios": "npx cap run ios"
   },
-  "engines": { "node": ">=24 <25" }
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.3"
+  },
+  "version": "7.4.0"
 }

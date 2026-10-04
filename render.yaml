@@ -13,7 +13,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: APP_VERSION
-        value: 6.9.0
+        value: 7.2.0
       - key: FRONTEND_ORIGIN
         value: ""
       - key: SPOTIFY_CLIENT_ID
@@ -32,3 +32,13 @@ services:
         sync: false
       - key: MUSICBRAINZ_USER_AGENT
         sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: luma

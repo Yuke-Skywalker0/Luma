@@ -1,0 +1,12 @@
+{
+  "version": "7.1.0",
+  "commands": [
+    {"intent":"play","phrases":["Riproduci {query}","Ascolta {query}"]},
+    {"intent":"pause","phrases":["Pausa","Metti in pausa"]},
+    {"intent":"next","phrases":["Prossima","Brano successivo"]},
+    {"intent":"previous","phrases":["Precedente","Brano precedente"]},
+    {"intent":"favorite","phrases":["Aggiungi ai preferiti"]},
+    {"intent":"open_library","phrases":["Apri libreria"]},
+    {"intent":"open_auto","phrases":["Attiva Auto Mode"]}
+  ]
+}

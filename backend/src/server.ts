@@ -4,6 +4,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { OAuth2Client } from 'google-auth-library';
+import jwt from 'jsonwebtoken';
+import { MongoClient } from 'mongodb';
 
 const app = express();
 const PORT = Number(process.env.PORT || 8787);
@@ -15,7 +18,16 @@ app.use(express.json({ limit: '1mb' }));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
-const APP_VERSION = process.env.APP_VERSION || '6.9.0';
+const APP_VERSION = process.env.APP_VERSION || '7.0.0';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION';
+const mongo = process.env.MONGODB_URI ? new MongoClient(process.env.MONGODB_URI) : null;
+let mongoDb: any = null;
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
+async function db(){ if(!mongo) return null; if(!mongoDb){ await mongo.connect(); mongoDb=mongo.db(process.env.MONGODB_DB||'luma'); } return mongoDb; }
+function signUser(u:any){ return jwt.sign({ sub:u.id, email:u.email, name:u.name, picture:u.picture||'' }, JWT_SECRET, { expiresIn:'30d' }); }
+function authUser(req:any){ const h=String(req.headers.authorization||''); if(!h.startsWith('Bearer ')) return null; try{return jwt.verify(h.slice(7),JWT_SECRET) as any;}catch{return null;} }
+async function spotifyPublicPlaylist(id:string){ const r=await spotify(`/playlists/${encodeURIComponent(id)}`, { market:'IT' }); if(!r) return null; const items:any[]=[]; let offset=0; while(offset<Number(r.items?.total||0) && offset<5000){ const page=await spotify(`/playlists/${encodeURIComponent(id)}/items`,{market:'IT',limit:'100',offset:String(offset)}); if(!page) break; for(const x of (page.items||[])){const t=x.item||x.track;if(t?.type==='track') items.push({id:`spotify:${t.id}`,title:t.name,artist:t.artists?.map((a:any)=>a.name).join(', ')||'',album:t.album?.name||'',artwork:t.album?.images?.[0]?.url,duration:Math.round((t.duration_ms||0)/1000),isrc:t.external_ids?.isrc,playable:false,provider:'spotify',providerId:t.id,externalUrl:t.external_urls?.spotify,version:detectVersion(t.name)});} offset += Number(page.items?.length||0); if(!page.next) break; } return {id:`spotify:playlist:${r.id}`,name:r.name,description:r.description||'',artwork:r.images?.[0]?.url,externalUrl:r.external_urls?.spotify,tracks:items,owner:r.owner?.display_name||r.owner?.id||''}; }
 const startedAt = Date.now();
 
 type Provider = 'spotify' | 'audius' | 'jamendo' | 'musicbrainz' | 'soundcloud';
@@ -165,7 +177,12 @@ async function cached<T>(key: string, fn: () => Promise<T>, ttl = 120000): Promi
 
 
 app.get('/health', (_, res) => res.json({ ok: true, version: APP_VERSION, graph: true, cache: true, cacheEntries: memoryCache.size, uptimeSeconds: Math.floor((Date.now()-startedAt)/1000) }));
-app.get('/api/config', (_, res) => res.json({ app: 'Luma Music', version: APP_VERSION, environment: process.env.NODE_ENV || 'production', frontend: true, providers: { spotify: Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET), audius: Boolean(process.env.AUDIUS_API_KEY || process.env.AUDIUS_API_BASE), jamendo: Boolean(process.env.JAMENDO_CLIENT_ID), soundcloud: Boolean(process.env.SOUNDCLOUD_CLIENT_ID), musicbrainz: true } }));
+app.get('/api/auth/status', async (req,res)=>{ const u=authUser(req); if(!u) return res.json({authenticated:false}); const database=await db(); const profile=database?await database.collection('users').findOne({id:u.sub}):null; return res.json({authenticated:true,user:profile||u}); });
+app.post('/api/auth/google', async (req,res)=>{ try{ if(!googleClient||!GOOGLE_CLIENT_ID) return res.status(503).json({error:'Google Auth not configured'}); const credential=String(req.body?.credential||''); if(!credential) return res.status(400).json({error:'Missing Google credential'}); const ticket=await googleClient.verifyIdToken({idToken:credential,audience:GOOGLE_CLIENT_ID}); const p=ticket.getPayload(); if(!p?.sub||!p.email) return res.status(401).json({error:'Invalid Google account'}); const user={id:`google:${p.sub}`,googleId:p.sub,email:p.email,name:p.name||p.email.split('@')[0],picture:p.picture||'',updatedAt:new Date(),createdAt:new Date()}; const database=await db(); let saved=user; if(database){ await database.collection('users').updateOne({id:user.id},{$set:{...user},$setOnInsert:{createdAt:user.createdAt}},{upsert:true}); saved=await database.collection('users').findOne({id:user.id})||user; } return res.json({token:signUser(saved),user:saved}); }catch(e){ console.error(e); return res.status(401).json({error:'Google authentication failed'}); } });
+app.get('/api/profile', async (req,res)=>{ const u=authUser(req); if(!u) return res.status(401).json({error:'Authentication required'}); const database=await db(); const profile=database?await database.collection('users').findOne({id:u.sub}):u; res.json(profile); });
+app.patch('/api/profile', async (req,res)=>{ const u=authUser(req); if(!u) return res.status(401).json({error:'Authentication required'}); const allowed:any={}; for(const k of ['name','picture','bio']) if(typeof req.body?.[k]==='string') allowed[k]=req.body[k].slice(0,500); allowed.updatedAt=new Date(); const database=await db(); if(database) await database.collection('users').updateOne({id:u.sub},{$set:allowed}); res.json({ok:true,profile:{...u,...allowed}}); });
+app.post('/api/import/spotify', async (req,res)=>{ const raw=String(req.body?.url||req.body?.id||'').trim(); const m=raw.match(/spotify\.com\/playlist\/([A-Za-z0-9]+)|^([A-Za-z0-9]{10,})$/); const id=m?.[1]||m?.[2]; if(!id) return res.status(400).json({error:'Inserisci un link Spotify di una playlist valido.'}); try{ const playlist=await spotifyPublicPlaylist(id); if(!playlist) return res.status(404).json({error:'Playlist non disponibile. Per una playlist privata servirà il collegamento Spotify dell’account.'}); res.json({ok:true,source:'spotify',playlist,importable:playlist.tracks.length}); }catch(e){res.status(502).json({error:'Impossibile leggere la playlist Spotify'});} });
+app.get('/api/config', (_, res) => res.json({ app: 'Luma Music', version: APP_VERSION, environment: process.env.NODE_ENV || 'production', frontend: true, googleAuth: Boolean(GOOGLE_CLIENT_ID), database: Boolean(process.env.MONGODB_URI), providers: { spotify: Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET), audius: Boolean(process.env.AUDIUS_API_KEY || process.env.AUDIUS_API_BASE), jamendo: Boolean(process.env.JAMENDO_CLIENT_ID), soundcloud: Boolean(process.env.SOUNDCLOUD_CLIENT_ID), musicbrainz: true } }));
 app.get('/api/version', (_, res) => res.json({ version: APP_VERSION }));
 app.get('/api/providers', (_, res) => res.json({ providers: [
   { id: 'spotify', role: 'metadata', configured: Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) },
@@ -186,7 +203,7 @@ app.get('/api/search', async (req, res) => {
     return {
       artists: sp.artists, albums: sp.albums, tracks: graph, musicbrainz: mb, total: sp.total,
       pagination: { offset, pageSize: 10, nextOffset: offset + 10, hasMore: offset + 10 < sp.total },
-      providers: { spotify: sp.tracks.length > 0 || sp.artists.length > 0, audius: au.length > 0, jamendo: ja.length > 0, musicbrainz: mb.length > 0 },
+      googleAuth: Boolean(GOOGLE_CLIENT_ID), database: Boolean(process.env.MONGODB_URI), providers: { spotify: sp.tracks.length > 0 || sp.artists.length > 0, audius: au.length > 0, jamendo: ja.length > 0, musicbrainz: mb.length > 0 },
       cache: { key: `search:${q}:${offset}`, ttlMs: 120000 }
     };
   });

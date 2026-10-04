@@ -1,6 +1,6 @@
 {
-  "version": "6.9.0",
-  "build": "2026-09-29",
-  "mandatory": true,
-  "message": "Luma Music 6.9.0: nuova libreria, playlist e controlli di produzione. Aggiorniamo l'app prima dell'avvio."
+  "version": "7.4.0",
+  "build": "offline-local-library",
+  "message": "Nuova libreria offline locale disponibile.",
+  "mandatory": false
 }

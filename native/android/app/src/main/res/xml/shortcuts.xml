@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- V7.1 App Actions contract. Wire these capabilities to the native Luma Activity in V7.2. -->
+    <capability android:name="actions.intent.PLAY_MUSIC">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="YOUR.APPLICATION.ID" android:targetClass="YOUR.APPLICATION.ID.MainActivity">
+            <parameter android:name="musicActivityName" android:key="query" />
+            <parameter android:name="songName" android:key="query" />
+            <parameter android:name="artistName" android:key="artist" />
+        </intent>
+    </capability>
+</shortcuts>
